@@ -31,6 +31,7 @@ posts = safe_read(DATA_PATHS["posts"])
 comments = safe_read(DATA_PATHS["comments"])
 anx = safe_read(DATA_PATHS["anxiety"])
 topic_dist = safe_read(DATA_PATHS["topic_dist"])
+topic_dist = topic_dist[topic_dist["Name"].notna()]
 topic_info = safe_read(DATA_PATHS["topic_info"])
 topic_examples = safe_read(DATA_PATHS["topic_examples"])
 
@@ -95,7 +96,7 @@ if topic_info is not None and len(topic_info):
     for c in df_t.columns:
         cl = c.lower()
         if tinfo_id is None and (("topic" in cl) or cl in ["id","topic_id","label_id"]): tinfo_id = c
-        if tinfo_label is None and "label" in cl: tinfo_label = c
+        if tinfo_label is None and "Name" in cl: tinfo_label = c
         if tinfo_kw is None and ("keyword" in cl or "terms" in cl): tinfo_kw = c
     if tinfo_id is None:
         df_t["Topic"] = np.arange(len(df_t)); tinfo_id = "Topic"
@@ -114,7 +115,7 @@ def get_topic_options():
     if topic_info is not None and len(topic_info):
         df = topic_info.copy()
         tid = next((c for c in df.columns if ("topic" in c.lower()) or (c.lower() in ["id","topic_id","label_id"])), None)
-        lab = next((c for c in df.columns if "label" in c.lower()), None)
+        lab = next((c for c in df.columns if "name" in c.lower()), None)
         if tid is None:
             df["Topic"] = np.arange(len(df)); tid = "Topic"
         if lab is None:
@@ -152,12 +153,14 @@ def filter_posts(posts_df, subreddit, selected_topic_values):
     if df is None: return None
     if subreddit and post_subreddit and subreddit != "__ALL__":
         df = df[df[post_subreddit] == subreddit]
+    """ Unclear what is trying to be done here
     if selected_topic_values and (td_id and post_id and td_topic and topic_dist is not None):
         want = set(map(str, selected_topic_values))
         td = topic_dist.copy()
         td[td_topic] = td[td_topic].astype(str)
         td_sub = td[td[td_topic].isin(want)][[td_id, td_topic]].dropna()
         df = df.merge(td_sub, left_on=post_id, right_on=td_id, how="inner")
+    """
     return df
 
 def filter_topic_dist(selected_topic_values):
@@ -166,7 +169,20 @@ def filter_topic_dist(selected_topic_values):
     want = set(map(str, selected_topic_values))
     td = topic_dist.copy()
     td[td_topic] = td[td_topic].astype(str)
+    out  = td[td[td_topic].isin(want)]
+    print(f"Выбрано {len(out)} строк из {len(topic_dist)} (фильтр по {want})")
     return td[td[td_topic].isin(want)]
+
+def filter_topic_info(selected_topic_values):
+    if topic_info is None or td_topic is None: return None
+    if not selected_topic_values: return topic_info.copy()
+    want = set(map(str, selected_topic_values))
+    td = topic_info.copy()
+    td[td_topic] = td[td_topic].astype(str)
+    out  = td[td[td_topic].isin(want)]
+    print(f"Выбрано {len(out)} строк из {len(topic_info)} (фильтр по {want})")
+    return td[td[td_topic].isin(want)]
+
 
 # figures
 def fig_posts_by_subreddit(df):
@@ -192,12 +208,30 @@ def fig_score_vs_comments(df):
                            title="engagement scatter: comments vs score"), 360)
 
 def fig_topics_treemap(td_subset):
+    print(td_subset)
     if td_subset is None or td_topic is None: return None
-    counts = td_subset.groupby(td_topic).size().rename("Count").reset_index()
-    counts[td_topic] = counts[td_topic].astype(str)
-    counts["LabelShort"] = counts[td_topic].map(lambda k: topic_label_map.get(k, f"Topic {k}")) \
-                                            .astype(str).str.slice(0, 60)
-    return lock(px.treemap(counts, path=["LabelShort"], values="Count", title="topic landscape (treemap)"), 420)
+    if td_subset["Name"].nunique() == 1:
+        fig = px.treemap(
+            td_subset, path=["Name"], values="Count",
+            color="Name",
+            hover_data=["Representation"] if "Representation" in td_subset.columns else None,
+            title="topic landscape (treemap)",
+            color_discrete_sequence=["#636EFA"]
+        )
+    else:
+        fig = px.treemap(
+            td_subset, path=["Name"], values="Count",
+            color="Name",
+            hover_data=["Representation"] if "Representation" in td_subset.columns else None,
+            title="topic landscape (treemap)",
+            color_discrete_sequence=px.colors.qualitative.Vivid  # любая палитра
+        )
+        fig.update_layout(
+            treemapcolorway=px.colors.qualitative.Vivid,
+            extendsunburstcolors=True
+        )
+
+    return lock(fig, 420)
 
 def fig_topic_engagement(df, td_subset):
     if df is None or td_subset is None or td_topic is None or td_id is None or post_id is None: return None
@@ -329,13 +363,14 @@ app.layout = html.Div(children=[
 @app.callback(
     Output("cards", "children"),
     Input("refresh", "n_clicks"),
-    State("subreddit", "value"),
-    State("topic-dd", "value"),
+    Input("subreddit", "value"),
+    Input("topic-dd", "value"),
     prevent_initial_call=False
 )
 def build_cards(n, subreddit_value, selected_topics):
     df_posts = filter_posts(posts, subreddit_value, selected_topics)
     td_subset = filter_topic_dist(selected_topics)
+    td_topic_info_subset = filter_topic_info(selected_topics)
 
     figs = []
     f1 = fig_posts_by_subreddit(df_posts);               f1 and figs.append(("Posts by Subreddit", f1, 360, ""))

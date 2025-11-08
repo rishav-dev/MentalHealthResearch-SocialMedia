@@ -355,8 +355,7 @@ app.layout = html.Div(children=[
                         style={"padding":"8px 12px","borderRadius":"8px","background":"#0b0d12","border":"1px solid #222636","color":"#eaeef2","cursor":"pointer"})
         ]),
     ]),
-    html.Div(id="cards", className="grid"),
-    html.Div(className="footer", children="made with ❤️ plotly • hover for details, drag to zoom, export pngs from the toolbar.")
+    html.Div(id="cards", className="grid")
 ])
 
 # callback
@@ -379,8 +378,7 @@ def build_cards(n, subreddit_value, selected_topics):
     f4 = fig_score_vs_comments(df_posts);                f4 and figs.append(("Engagement Scatter (Comments vs Score)", f4, 360, ""))
     f5 = fig_topics_treemap(td_subset);                  f5 and figs.append(("Topic Landscape (Treemap)", f5, 420, ""))
     f6 = fig_topic_engagement(df_posts, td_subset);      f6 and figs.append(("Topic Engagement", f6, 360, ""))
-    f7 = fig_top_topics_bar(td_subset);                  f7 and figs.append(("Top Topics in Selection", f7, 360, ""))
-
+    
     table = fig_top_posts_table(df_posts, k=20)
 
     cards = []

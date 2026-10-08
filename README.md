@@ -43,5 +43,3 @@ python dashboard.py
 ```
 
 Re-collecting data needs Reddit API credentials in a `.env` file (`REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`). The collected CSVs are included, so you can skip `reddit_data_collection.py`.
-
-Built with a group for a data visualization course at UMass Amherst.
